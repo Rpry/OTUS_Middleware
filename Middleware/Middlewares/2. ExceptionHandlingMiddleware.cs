@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace FunWithMiddleware.Middlewares
+namespace Middleware.Middlewares
 {
   public class HttpStatusCodeExceptionMiddleware
   {
@@ -19,11 +19,13 @@ namespace FunWithMiddleware.Middlewares
       _next = next;
     }
     
-    public async Task Invoke(HttpContext context, ILogger<HttpStatusCodeExceptionMiddleware> logger, IWebHostEnvironment webHostEnvironment)
+    public async Task Invoke(HttpContext context, 
+      ILogger<HttpStatusCodeExceptionMiddleware> logger,
+      IWebHostEnvironment webHostEnvironment)
     {
+      context.Request.EnableBuffering();
       try
       {
-        context.Request.EnableBuffering();
         await _next(context);
       }
       catch (Exception ex)

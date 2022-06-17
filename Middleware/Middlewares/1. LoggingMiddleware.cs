@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
-namespace FunWithMiddleware.Middlewares
+namespace Middleware.Middlewares
 {
   public class LoggingMiddleware
   {
