@@ -42,7 +42,7 @@ namespace Middleware
       //регистрация методом расширения
       //app.UseRequestCulture();
       //app.UseHttpRequestLogging();
-      //app.UseCaching();
+      app.RateCacheLimiterMiddleware();
       //app.UseRateLimiting();
       
       app.UseRouting();
