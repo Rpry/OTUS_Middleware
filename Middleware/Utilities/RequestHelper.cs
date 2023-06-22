@@ -1,7 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Http;
 
-namespace Middleware
+namespace Middleware.Utilities
 {
     public static class RequestHelper
     {

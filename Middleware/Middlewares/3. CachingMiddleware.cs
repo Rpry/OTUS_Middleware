@@ -8,49 +8,61 @@ using Microsoft.Extensions.Logging;
 
 namespace Middleware.Middlewares
 {
-  public class CachingMiddleware
-  {
-    private readonly RequestDelegate _next;
+    public class CachingMiddleware
+    {
+        private readonly RequestDelegate _next;
+        private readonly ILogger<CachingMiddleware> _logger;
 
-    public CachingMiddleware(RequestDelegate next)
-    {
-      _next = next;
+        public CachingMiddleware(RequestDelegate next, ILogger<CachingMiddleware> logger)
+        {
+            _next = next;
+            _logger = logger;
+        }
+
+        public async Task InvokeAsync(HttpContext context,
+            IMemoryCache memoryCache)
+        {
+            context.Request.EnableBuffering();
+            var key = $"caching_{context.Request.Path.ToString()}";
+            var cache = memoryCache.Get<byte[]>(key);
+            if (cache != null)
+                await GetDataFromCache(context, memoryCache, key);
+            else
+                await SaveDataToCacheEndExecuteNext(context, memoryCache, _next);
+        }
+
+        private async Task GetDataFromCache(HttpContext context,
+            IMemoryCache memoryCache, string key)
+        {
+            var cache = memoryCache.Get<byte[]>(key);
+            var responseStream = context.Response.Body;
+            _logger.LogInformation("taking data from cache");
+            context.Response.Body = responseStream;
+            context.Response.Headers.Append("Content-Type", "text/plain; charset=utf-8");
+            await context.Response.Body.WriteAsync(cache);
+        }
+
+        private async Task SaveDataToCacheEndExecuteNext(HttpContext context,
+            IMemoryCache memoryCache, RequestDelegate requestDelegate)
+        {
+            var responseStream = context.Response.Body;
+            var key = $"caching_{context.Request.Path.ToString()}";
+            _logger.LogInformation("taking data from action method");
+            await using var ms = new MemoryStream();
+            context.Response.Body = ms;
+            await requestDelegate(context);
+            memoryCache.Set(key, ms.ToArray(),
+                TimeSpan.FromSeconds(5));
+            context.Response.Body = responseStream;
+            await context.Response.Body.WriteAsync(ms.ToArray());
+        }
     }
 
-    public async Task InvokeAsync(HttpContext context,
-      IMemoryCache memoryCache,
-      ILogger<CachingMiddleware> logger)
+    public static class CachingExtensions
     {
-      context.Request.EnableBuffering();
-      
-      var responseStream = context.Response.Body;
-      var key = context.Request.Path.ToString();
-      var cache = memoryCache.Get<byte[]>(key);
-      if (cache != null)
-      {
-        logger.LogInformation("taking data from cache");
-        context.Response.Body = responseStream;
-        context.Response.Headers.Append("Content-Type", "text/plain; charset=utf-8");
-        await context.Response.Body.WriteAsync(cache);
-      }
-      else
-      {
-        logger.LogInformation("taking data from action method");
-        await using var ms = new MemoryStream();
-        context.Response.Body = ms;
-        await _next(context);
-        memoryCache.Set(key, ms.ToArray(), TimeSpan.FromSeconds(5));
-        context.Response.Body = responseStream;
-        await context.Response.Body.WriteAsync(ms.ToArray());
-      }
+        public static IApplicationBuilder UseCaching(this IApplicationBuilder builder)
+        {
+            return builder.UseMiddleware<CachingMiddleware>();
+        }
     }
-  }
-  
-  public static class CachingExtensions
-  {
-    public static IApplicationBuilder UseCaching(this IApplicationBuilder builder)
-    {
-      return builder.UseMiddleware<CachingMiddleware>();
-    }
-  }
 }
