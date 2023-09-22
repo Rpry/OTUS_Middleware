@@ -6,19 +6,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Middleware.Middlewares
 {
-    public class LoggingMiddleware
+    public class SimpleLoggingMiddleware
     {
         private readonly RequestDelegate _next;
 
-        private const string MessageTemplate = "HTTP {RequestMethod} {RequestPath} {Query} {QueryString} " +
-                                               "responded {StatusCode} in {Elapsed}";
+        private const string MessageTemplate = "Request: {RequestMethod} {Domain}{RequestPath}, Response: {StatusCode} Elapsed: {Elapsed}";
 
-        public LoggingMiddleware(RequestDelegate next)
+        public SimpleLoggingMiddleware(RequestDelegate next)
         {
             _next = next;
         }
 
-        public async Task InvokeAsync(HttpContext httpContext, ILogger<LoggingMiddleware> logger)
+        public async Task InvokeAsync(HttpContext httpContext, ILogger<SimpleLoggingMiddleware> logger)
         {
             var timer = new Stopwatch();
             timer.Start();
@@ -27,8 +26,7 @@ namespace Middleware.Middlewares
             var elapsedMs = timer.Elapsed;
 
             logger.Log(LogLevel.Information, MessageTemplate,
-                httpContext.Request.Method, httpContext.Request.Path,
-                httpContext.Request.Query, httpContext.Request.QueryString,
+                httpContext.Request.Method, httpContext.Request.Host.Value, httpContext.Request.Path,
                 httpContext.Response?.StatusCode, elapsedMs.TotalMilliseconds
             );
         }
@@ -36,9 +34,9 @@ namespace Middleware.Middlewares
 
     public static class LoggingMiddlewareAppExtensions
     {
-        public static IApplicationBuilder UseHttpRequestLogging(this IApplicationBuilder applicationBuilder)
+        public static IApplicationBuilder UseSimpleHttpLogging(this IApplicationBuilder applicationBuilder)
         {
-            return applicationBuilder.UseMiddleware<LoggingMiddleware>();
+            return applicationBuilder.UseMiddleware<SimpleLoggingMiddleware>();
         }
     }
 }

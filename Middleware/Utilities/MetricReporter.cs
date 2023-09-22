@@ -25,12 +25,12 @@ namespace Middleware.Utilities
                 });
         }
 
-        public void RegisterRequest()
+        public void IncrementRequestCounter()
         {
             _requestCounter.Inc();
         }
 
-        public void RegisterResponseTime(int statusCode, string method, TimeSpan elapsed)
+        public void AddResponseTime(int statusCode, string method, TimeSpan elapsed)
         {
             _responseTimeHistogram.Labels(statusCode.ToString(), method).Observe(elapsed.TotalSeconds);
         }

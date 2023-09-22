@@ -8,12 +8,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Middleware.Middlewares
 {
-    public class CachingMiddleware
+    public class SimpleCachingMiddleware
     {
         private readonly RequestDelegate _next;
-        private readonly ILogger<CachingMiddleware> _logger;
+        private readonly ILogger<SimpleCachingMiddleware> _logger;
 
-        public CachingMiddleware(RequestDelegate next, ILogger<CachingMiddleware> logger)
+        public SimpleCachingMiddleware(RequestDelegate next, ILogger<SimpleCachingMiddleware> logger)
         {
             _next = next;
             _logger = logger;
@@ -22,13 +22,16 @@ namespace Middleware.Middlewares
         public async Task InvokeAsync(HttpContext context,
             IMemoryCache memoryCache)
         {
-            context.Request.EnableBuffering();
-            var key = $"caching_{context.Request.Path.ToString()}";
-            var cache = memoryCache.Get<byte[]>(key);
-            if (cache != null)
-                await GetDataFromCache(context, memoryCache, key);
-            else
-                await SaveDataToCacheEndExecuteNext(context, memoryCache, _next);
+            if (context.Request.Path == "/test/time")
+            {
+                context.Request.EnableBuffering();
+                var key = $"caching_{context.Request.Path.ToString()}";
+                var cache = memoryCache.Get<byte[]>(key);
+                if (cache != null)
+                    await GetDataFromCache(context, memoryCache, key);
+                else
+                    await SaveDataToCacheEndExecuteNext(context, memoryCache, _next);    
+            }
         }
 
         private async Task GetDataFromCache(HttpContext context,
@@ -60,9 +63,9 @@ namespace Middleware.Middlewares
 
     public static class CachingExtensions
     {
-        public static IApplicationBuilder UseCaching(this IApplicationBuilder builder)
+        public static IApplicationBuilder UseSimpleCaching(this IApplicationBuilder builder)
         {
-            return builder.UseMiddleware<CachingMiddleware>();
+            return builder.UseMiddleware<SimpleCachingMiddleware>();
         }
     }
 }

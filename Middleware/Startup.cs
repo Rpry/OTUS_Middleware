@@ -1,7 +1,10 @@
+using System;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,8 +40,27 @@ namespace Middleware
                 {
                     "SampleHealthCheck"
                 });
+              
             
-
+            services.AddHttpLogging(httpLoggingOptions =>
+            {
+                httpLoggingOptions.LoggingFields =
+                    HttpLoggingFields.All;
+            });
+            services.AddResponseCaching((opt) =>
+            {
+            });
+            
+            services.AddRateLimiter(options => {
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+                    httpContext => RateLimitPartition.GetFixedWindowLimiter(partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(), factory: partition => new FixedWindowRateLimiterOptions {
+                    AutoReplenishment = true,
+                    PermitLimit = 5,
+                    QueueLimit = 0,
+                    Window = TimeSpan.FromMinutes(1)
+                }));
+                options.RejectionStatusCode = 429;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -64,48 +86,51 @@ namespace Middleware
             */
 
             //регистрация с помощью UseMiddleware
-            //app.UseMiddleware<RequestCultureMiddleware>();
+            app.UseMiddleware<RequestCultureMiddleware>();
 
             //регистрация методом расширения
-            //app.UseRequestCulture();
+            app.UseRequestCulture();
 
             #endregion
 
             #region Conditional
-          
             /*
+            
             app.Map("/test/error" , appBuilder =>
             {
               appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
-            */
-            /*
+            
+            
             app.MapWhen(context => context.Request.Path.StartsWithSegments("/test/error"), (appBuilder) =>
             {
                 appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
-            */
             
+            */
             #endregion
 
             #region Виды пользовательских миддлваре
 
+            //app.UseRequestCulture();
+            
             //Логирование запроса
-            //app.UseHttpRequestLogging();
-
+            //app.UseSimpleHttpLogging();
+            //app.UseHttpLogging();
+            
             //Обработка исключений
-            //app.UseExceptionHandlingMiddleware();
+            //app.UseSimpleExceptionHandling();
 
             //Кеширование запроса
-            ///app.UseCaching();
+            //app.UseSimpleCaching();
+            //app.UseResponseCaching();
 
             //Антитроттлинг
-            //app.UseRateLimiting();
-            //app.UseRatiLimiterWithCaching();
+            //app.UseSimpleRateLimiter();
+            //app.UseRateLimiter();  //.Net7
 
             //Хелсчек
             app.UseHealthChecks("/health");
-            
             app.UseHealthChecks("/samplehealth", new HealthCheckOptions()
             {
                 Predicate = healthCheck => healthCheck.Tags.Contains("SampleHealthCheck")

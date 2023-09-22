@@ -33,8 +33,8 @@ namespace Middleware.Middlewares
             finally
             {
                 sw.Stop();
-                reporter.RegisterRequest();
-                reporter.RegisterResponseTime(httpContext.Response.StatusCode, httpContext.Request.Method, sw.Elapsed);
+                reporter.IncrementRequestCounter();
+                reporter.AddResponseTime(httpContext.Response.StatusCode, httpContext.Request.Method, sw.Elapsed);
             }
         }
     }

@@ -7,11 +7,11 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Middleware.Middlewares
 {
-    public class RateLimiterMiddleware
+    public class SimpleRateLimiterMiddleware
     {
         private readonly RequestDelegate _next;
 
-        public RateLimiterMiddleware(RequestDelegate next)
+        public SimpleRateLimiterMiddleware(RequestDelegate next)
         {
             _next = next;
         }
@@ -20,7 +20,7 @@ namespace Middleware.Middlewares
         {
             var now = DateTime.UtcNow;
             var minInterval = TimeSpan.FromSeconds(5);
-            var key = $"rateLimiting_{context.Request.Path.ToString()}";
+            var key = $"rateLimiting_{context.Request.Headers["IP"].ToString()}";
             var lastRequestDate = memoryCache.Get<DateTime?>(key);
             if (lastRequestDate != null && now - lastRequestDate < minInterval)
             {
@@ -38,9 +38,9 @@ namespace Middleware.Middlewares
 
     public static class RateLimiterExtensions
     {
-        public static IApplicationBuilder UseRateLimiting(this IApplicationBuilder builder)
+        public static IApplicationBuilder UseSimpleRateLimiter(this IApplicationBuilder builder)
         {
-            return builder.UseMiddleware<RateLimiterMiddleware>();
+            return builder.UseMiddleware<SimpleRateLimiterMiddleware>();
         }
     }
 }
