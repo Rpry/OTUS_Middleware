@@ -17,6 +17,7 @@ namespace Middleware.Controllers
         }
 
         [HttpGet("time")]
+        [ResponseCache(Duration = 10)]
         public string Get()
         {
             return DateTime.Now.ToString("f");

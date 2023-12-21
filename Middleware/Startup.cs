@@ -1,10 +1,14 @@
 using System;
+using System.IO;
+using System.Net.Mime;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,15 +36,13 @@ namespace Middleware
             services.AddSingleton<MetricReporter>();
 
             services.AddHealthChecks()
-              //.AddCheck<SampleHealthCheck>("SampleHealthCheck");
-              .AddCheck<SampleHealthCheck>(
+                .AddCheck<SampleHealthCheck>(
                 "SampleHealthCheck",
                 failureStatus: HealthStatus.Unhealthy,
                 tags: new[]
                 {
                     "SampleHealthCheck"
                 });
-              
             
             services.AddHttpLogging(httpLoggingOptions =>
             {
@@ -56,7 +58,6 @@ namespace Middleware
                     httpContext => RateLimitPartition.GetFixedWindowLimiter(partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(), factory: partition => new FixedWindowRateLimiterOptions {
                     AutoReplenishment = true,
                     PermitLimit = 5,
-                    QueueLimit = 0,
                     Window = TimeSpan.FromMinutes(1)
                 }));
                 options.RejectionStatusCode = 429;
@@ -86,28 +87,26 @@ namespace Middleware
             */
 
             //регистрация с помощью UseMiddleware
-            app.UseMiddleware<RequestCultureMiddleware>();
+            //app.UseMiddleware<RequestCultureMiddleware>();
 
             //регистрация методом расширения
-            app.UseRequestCulture();
+            //app.UseRequestCulture();
 
             #endregion
 
             #region Conditional
             /*
-            
             app.Map("/test/error" , appBuilder =>
             {
               appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
             
-            
             app.MapWhen(context => context.Request.Path.StartsWithSegments("/test/error"), (appBuilder) =>
             {
                 appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
-            
             */
+            
             #endregion
 
             #region Виды пользовательских миддлваре
@@ -120,6 +119,7 @@ namespace Middleware
             
             //Обработка исключений
             //app.UseSimpleExceptionHandling();
+            //app.UseExceptionHandler(options => { });
 
             //Кеширование запроса
             //app.UseSimpleCaching();
@@ -127,7 +127,7 @@ namespace Middleware
 
             //Антитроттлинг
             //app.UseSimpleRateLimiter();
-            //app.UseRateLimiter();  //.Net7
+            //app.UseRateLimiter(); //https://blog.maartenballiauw.be/post/2022/09/26/aspnet-core-rate-limiting-middleware.html
 
             //Хелсчек
             app.UseHealthChecks("/health");
@@ -144,8 +144,10 @@ namespace Middleware
 
             app.UseRouting();
             app.UseAuthorization();
-
-            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
         }
     }
 }
