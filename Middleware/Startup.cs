@@ -34,7 +34,6 @@ namespace Middleware
             services.AddControllers();
             services.AddSingleton<IMemoryCache, MemoryCache>();
             services.AddSingleton<MetricReporter>();
-
             services.AddHealthChecks()
                 .AddCheck<SampleHealthCheck>(
                 "SampleHealthCheck",
@@ -72,7 +71,6 @@ namespace Middleware
             #region Виды регистраций
 
             //регистрация делегатом
-            
             /*
             app.Use(async (context, next) =>
             {
@@ -85,7 +83,6 @@ namespace Middleware
               //await context.Response.WriteAsync("Hello from middleware delegate.");
             });
             */
-
             //регистрация с помощью UseMiddleware
             //app.UseMiddleware<RequestCultureMiddleware>();
 
@@ -96,7 +93,7 @@ namespace Middleware
 
             #region Conditional
             /*
-            app.Map("/test/error" , appBuilder =>
+            app.Map("/test/error", appBuilder =>
             {
               appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
@@ -114,28 +111,30 @@ namespace Middleware
             //app.UseRequestCulture();
             
             //Логирование запроса
-            //app.UseSimpleHttpLogging();
+            app.UseSimpleHttpLogging();
             //app.UseHttpLogging();
             
             //Обработка исключений
             //app.UseSimpleExceptionHandling();
-            //app.UseExceptionHandler(options => { });
+            //app.UseExceptionHandler(options => {});
 
             //Кеширование запроса
             //app.UseSimpleCaching();
             //app.UseResponseCaching();
 
-            //Антитроттлинг
+            //Ограничение интенсивности запросов
             //app.UseSimpleRateLimiter();
             //app.UseRateLimiter(); //https://blog.maartenballiauw.be/post/2022/09/26/aspnet-core-rate-limiting-middleware.html
 
             //Хелсчек
             app.UseHealthChecks("/health");
+            /*
             app.UseHealthChecks("/samplehealth", new HealthCheckOptions()
             {
                 Predicate = healthCheck => healthCheck.Tags.Contains("SampleHealthCheck")
             });
-
+            */
+            
             //Метрики для прометеуса
             app.UseMetricServer();
             app.UseMiddleware<ResponseMetricMiddleware>();

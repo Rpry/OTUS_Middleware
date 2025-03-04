@@ -16,11 +16,11 @@ namespace Middleware.Controllers
             _logger = logger;
         }
 
+        [ResponseCache(Duration = 10, Location = ResponseCacheLocation.Any)]
         [HttpGet("time")]
-        [ResponseCache(Duration = 10)]
-        public string Get()
+        public IActionResult Get()
         {
-            return DateTime.Now.ToString("f");
+            return Ok(DateTime.Now.ToString("f"));
         }
 
         [HttpGet("error")]
