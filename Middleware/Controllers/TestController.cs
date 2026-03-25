@@ -16,7 +16,7 @@ namespace Middleware.Controllers
             _logger = logger;
         }
 
-        [ResponseCache(Duration = 10, Location = ResponseCacheLocation.Any)]
+        [ResponseCache(Duration = 10)]
         [HttpGet("time")]
         public IActionResult Get()
         {

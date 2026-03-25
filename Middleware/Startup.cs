@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Mime;
 using System.Threading.RateLimiting;
@@ -13,6 +14,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Primitives;
+
 using Middleware.Middlewares;
 using Middleware.Utilities;
 using Prometheus;
@@ -42,7 +45,7 @@ namespace Middleware
                 {
                     "SampleHealthCheck"
                 });
-            
+
             services.AddHttpLogging(httpLoggingOptions =>
             {
                 httpLoggingOptions.LoggingFields =
@@ -51,14 +54,15 @@ namespace Middleware
             services.AddResponseCaching((opt) =>
             {
             });
-            
-            services.AddRateLimiter(options => {
+
+            services.AddRateLimiter(options =>
+            {
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
                     httpContext => RateLimitPartition.GetFixedWindowLimiter(partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(), factory: partition => new FixedWindowRateLimiterOptions {
-                    AutoReplenishment = true,
-                    PermitLimit = 5,
-                    Window = TimeSpan.FromMinutes(1)
-                }));
+                        AutoReplenishment = true,
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1)
+                    }));
                 options.RejectionStatusCode = 429;
             });
         }
@@ -74,15 +78,17 @@ namespace Middleware
             /*
             app.Use(async (context, next) =>
             {
-              //await context.Response.WriteAsync("Hello from middleware delegate.");
+              await context.Response.WriteAsync("Hello from middleware delegate.");
               await next.Invoke();
             });
-                  
+            */
+            /*
             app.Run(async (context) =>
             {
-              //await context.Response.WriteAsync("Hello from middleware delegate.");
+              await context.Response.WriteAsync("Hello from middleware delegate.");
             });
             */
+    
             //регистрация с помощью UseMiddleware
             //app.UseMiddleware<RequestCultureMiddleware>();
 
@@ -97,13 +103,14 @@ namespace Middleware
             {
               appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
-            
-            app.MapWhen(context => context.Request.Path.StartsWithSegments("/test/error"), (appBuilder) =>
+            */
+            /*
+            app.MapWhen(context => context.Request
+                .Headers.Contains(new KeyValuePair<string, StringValues>("IP", new StringValues("1"))), (appBuilder) =>
             {
                 appBuilder.UseMiddleware<RequestCultureMiddleware>();
             });
             */
-            
             #endregion
 
             #region Виды пользовательских миддлваре
@@ -111,7 +118,7 @@ namespace Middleware
             //app.UseRequestCulture();
             
             //Логирование запроса
-            app.UseSimpleHttpLogging();
+            //app.UseSimpleHttpLogging();
             //app.UseHttpLogging();
             
             //Обработка исключений
@@ -127,7 +134,7 @@ namespace Middleware
             //app.UseRateLimiter(); //https://blog.maartenballiauw.be/post/2022/09/26/aspnet-core-rate-limiting-middleware.html
 
             //Хелсчек
-            app.UseHealthChecks("/health");
+            //app.UseHealthChecks("/health");
             /*
             app.UseHealthChecks("/samplehealth", new HealthCheckOptions()
             {
