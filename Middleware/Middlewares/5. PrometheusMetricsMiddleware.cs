@@ -6,7 +6,7 @@ using Middleware.Utilities;
 
 namespace Middleware.Middlewares
 {
-    public class ResponseMetricMiddleware
+    public sealed class ResponseMetricMiddleware
     {
         private readonly RequestDelegate _request;
 

@@ -4,43 +4,83 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Middleware.Options;
 
-namespace Middleware.Middlewares
+namespace Middleware.Middlewares;
+
+public sealed class SimpleRateLimiterMiddleware
 {
-    public class SimpleRateLimiterMiddleware
+    private readonly RequestDelegate _next;
+    private readonly SimpleRateLimiterOptions _options;
+
+    public SimpleRateLimiterMiddleware(
+        RequestDelegate next,
+        IOptions<SimpleRateLimiterOptions> options)
     {
-        private readonly RequestDelegate _next;
-
-        public SimpleRateLimiterMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
-
-        public async Task InvokeAsync(HttpContext context, IMemoryCache memoryCache)
-        {
-            var now = DateTime.UtcNow;
-            var minInterval = TimeSpan.FromSeconds(5);
-            var key = $"rateLimiting_{context.Request.Headers["IP"].ToString()}";
-            var lastRequestDate = memoryCache.Get<DateTime?>(key);
-            if (lastRequestDate != null && now - lastRequestDate < minInterval)
-            {
-                context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
-                context.Response.Headers["Retry-After"] =
-                    (lastRequestDate - now + minInterval).Value.TotalSeconds.ToString("#");
-            }
-            else
-            {
-                memoryCache.Set<DateTime>(key, now);
-                await _next(context);
-            }
-        }
+        _next = next;
+        _options = options.Value;
     }
 
-    public static class RateLimiterExtensions
+    public async Task InvokeAsync(HttpContext context, IMemoryCache memoryCache)
     {
-        public static IApplicationBuilder UseSimpleRateLimiter(this IApplicationBuilder builder)
+        var clientId = GetClientIdentifier(context);
+        var cacheKey = $"{_options.CacheKeyPrefix}{clientId}";
+        var now = DateTime.UtcNow;
+
+        if (IsRateLimited(memoryCache, cacheKey, now, out var retryAfter))
         {
-            return builder.UseMiddleware<SimpleRateLimiterMiddleware>();
+            await WriteRateLimitedResponse(context, retryAfter);
+            return;
         }
+
+        memoryCache.Set(cacheKey, now, _options.Interval);
+        await _next(context);
+    }
+
+    private string GetClientIdentifier(HttpContext context)
+    {
+        return context.Request.Headers[_options.ClientIdentifierHeader].ToString();
+    }
+
+    private bool IsRateLimited(IMemoryCache cache, string key, DateTime now, out TimeSpan retryAfter)
+    {
+        retryAfter = TimeSpan.Zero;
+
+        if (!cache.TryGetValue<DateTime>(key, out var lastRequestTime))
+            return false;
+
+        var elapsed = now - lastRequestTime;
+        if (elapsed >= _options.Interval)
+            return false;
+
+        retryAfter = _options.Interval - elapsed;
+        return true;
+    }
+
+    private static async Task WriteRateLimitedResponse(HttpContext context, TimeSpan retryAfter)
+    {
+        context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+        context.Response.Headers["Retry-After"] = Math.Ceiling(retryAfter.TotalSeconds).ToString();
+        await context.Response.WriteAsync("Too many requests. Please try again later.");
+    }
+}
+
+public static class RateLimiterExtensions
+{
+    public static IApplicationBuilder UseSimpleRateLimiter(this IApplicationBuilder builder)
+    {
+        return builder.UseMiddleware<SimpleRateLimiterMiddleware>();
+    }
+
+    public static IServiceCollection AddSimpleRateLimiter(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<SimpleRateLimiterOptions>(
+            configuration.GetSection(SimpleRateLimiterOptions.SectionName));
+        return services;
     }
 }

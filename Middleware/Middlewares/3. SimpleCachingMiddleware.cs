@@ -1,71 +1,101 @@
-using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Middleware.Options;
 
-namespace Middleware.Middlewares
+namespace Middleware.Middlewares;
+
+public sealed class SimpleCachingMiddleware
 {
-    public class SimpleCachingMiddleware
+    private readonly RequestDelegate _next;
+    private readonly ILogger<SimpleCachingMiddleware> _logger;
+    private readonly SimpleCachingOptions _options;
+
+    public SimpleCachingMiddleware(
+        RequestDelegate next,
+        ILogger<SimpleCachingMiddleware> logger,
+        IOptions<SimpleCachingOptions> options)
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger<SimpleCachingMiddleware> _logger;
-
-        public SimpleCachingMiddleware(RequestDelegate next, ILogger<SimpleCachingMiddleware> logger)
-        {
-            _next = next;
-            _logger = logger;
-        }
-
-        public async Task InvokeAsync(HttpContext context,
-            IMemoryCache memoryCache)
-        {
-            if (context.Request.Path == "/test/time")
-            {
-                context.Request.EnableBuffering();
-                var key = $"caching_{context.Request.Path.ToString()}";
-                var cache = memoryCache.Get<byte[]>(key);
-                if (cache != null)
-                    await GetDataFromCache(context, memoryCache, key);
-                else
-                    await SaveDataToCacheEndExecuteNext(context, memoryCache, _next);    
-            }
-        }
-
-        private async Task GetDataFromCache(HttpContext context,
-            IMemoryCache memoryCache, string key)
-        {
-            var cache = memoryCache.Get<byte[]>(key);
-            var responseStream = context.Response.Body;
-            _logger.LogInformation("taking data from cache");
-            context.Response.Body = responseStream;
-            context.Response.Headers.Append("Content-Type", "text/plain; charset=utf-8");
-            await context.Response.Body.WriteAsync(cache);
-        }
-
-        private async Task SaveDataToCacheEndExecuteNext(HttpContext context,
-            IMemoryCache memoryCache, RequestDelegate requestDelegate)
-        {
-            var responseStream = context.Response.Body;
-            var key = $"caching_{context.Request.Path.ToString()}";
-            _logger.LogInformation("taking data from action method");
-            await using var ms = new MemoryStream();
-            context.Response.Body = ms;
-            await requestDelegate(context);
-            memoryCache.Set(key, ms.ToArray(),
-                TimeSpan.FromSeconds(5));
-            context.Response.Body = responseStream;
-            await context.Response.Body.WriteAsync(ms.ToArray());
-        }
+        _next = next;
+        _logger = logger;
+        _options = options.Value;
     }
 
-    public static class CachingExtensions
+    public async Task InvokeAsync(HttpContext context, IMemoryCache memoryCache)
     {
-        public static IApplicationBuilder UseSimpleCaching(this IApplicationBuilder builder)
+        if (!ShouldCache(context))
         {
-            return builder.UseMiddleware<SimpleCachingMiddleware>();
+            await _next(context);
+            return;
         }
+
+        var cacheKey = GetCacheKey(context.Request.Path);
+
+        if (memoryCache.TryGetValue<byte[]>(cacheKey, out var cachedResponse))
+        {
+            await WriteCachedResponse(context, cachedResponse);
+            return;
+        }
+
+        await ExecuteAndCacheResponse(context, memoryCache, cacheKey);
+    }
+
+    private bool ShouldCache(HttpContext context)
+    {
+        return _options.CacheablePaths.Contains(context.Request.Path.Value ?? string.Empty);
+    }
+
+    private string GetCacheKey(PathString path)
+    {
+        return $"{_options.CacheKeyPrefix}{path}";
+    }
+
+    private async Task WriteCachedResponse(HttpContext context, byte[] cachedData)
+    {
+        _logger.LogInformation("Returning cached response for {Path}", context.Request.Path);
+        
+        context.Response.ContentType = "text/plain; charset=utf-8";
+        await context.Response.Body.WriteAsync(cachedData);
+    }
+
+    private async Task ExecuteAndCacheResponse(HttpContext context, IMemoryCache memoryCache, string cacheKey)
+    {
+        _logger.LogInformation("Executing request and caching response for {Path}", context.Request.Path);
+
+        var originalBodyStream = context.Response.Body;
+
+        await using var memoryStream = new MemoryStream();
+        context.Response.Body = memoryStream;
+
+        await _next(context);
+
+        var responseBytes = memoryStream.ToArray();
+        memoryCache.Set(cacheKey, responseBytes, _options.CacheDuration);
+
+        context.Response.Body = originalBodyStream;
+        await originalBodyStream.WriteAsync(responseBytes);
+    }
+}
+
+public static class CachingExtensions
+{
+    public static IApplicationBuilder UseSimpleCaching(this IApplicationBuilder builder)
+    {
+        return builder.UseMiddleware<SimpleCachingMiddleware>();
+    }
+
+    public static IServiceCollection AddSimpleCaching(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<SimpleCachingOptions>(
+            configuration.GetSection(SimpleCachingOptions.SectionName));
+        return services;
     }
 }

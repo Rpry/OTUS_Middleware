@@ -32,7 +32,8 @@ namespace Middleware.Utilities
 
         public void AddResponseTime(int statusCode, string method, TimeSpan elapsed)
         {
-            _responseTimeHistogram.Labels(statusCode.ToString(), method).Observe(elapsed.TotalSeconds);
+            _responseTimeHistogram.Labels(statusCode.ToString(), method)
+                .Observe(elapsed.TotalSeconds);
         }
     }
 }

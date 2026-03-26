@@ -17,6 +17,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Primitives;
 
 using Middleware.Middlewares;
+using Middleware.Options;
 using Middleware.Utilities;
 using Prometheus;
 
@@ -54,6 +55,12 @@ namespace Middleware
             services.AddResponseCaching((opt) =>
             {
             });
+
+            // Настройка кэширования из appsettings.json
+            services.AddSimpleCaching(Configuration);
+
+            // Настройка rate limiter из appsettings.json
+            services.AddSimpleRateLimiter(Configuration);
 
             services.AddRateLimiter(options =>
             {
@@ -115,7 +122,7 @@ namespace Middleware
 
             #region Виды пользовательских миддлваре
 
-            //app.UseRequestCulture();
+            app.UseRequestCulture();
             
             //Логирование запроса
             //app.UseSimpleHttpLogging();
@@ -127,20 +134,18 @@ namespace Middleware
 
             //Кеширование запроса
             //app.UseSimpleCaching();
-            //app.UseResponseCaching();
+            app.UseResponseCaching();
 
             //Ограничение интенсивности запросов
             //app.UseSimpleRateLimiter();
             //app.UseRateLimiter(); //https://blog.maartenballiauw.be/post/2022/09/26/aspnet-core-rate-limiting-middleware.html
 
             //Хелсчек
-            //app.UseHealthChecks("/health");
-            /*
+            app.UseHealthChecks("/health");
             app.UseHealthChecks("/samplehealth", new HealthCheckOptions()
             {
                 Predicate = healthCheck => healthCheck.Tags.Contains("SampleHealthCheck")
             });
-            */
             
             //Метрики для прометеуса
             app.UseMetricServer();
